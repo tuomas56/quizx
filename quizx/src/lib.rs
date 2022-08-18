@@ -30,4 +30,5 @@ pub mod simplify;
 pub mod extract;
 pub mod decompose;
 pub mod annealer;
+#[cfg(feature = "editor")] pub mod editor;
 
