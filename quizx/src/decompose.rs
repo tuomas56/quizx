@@ -16,6 +16,8 @@
 
 use num::Rational;
 use std::collections::VecDeque;
+use std::time::Duration;
+use std::time::Instant;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 use crate::graph::*;
@@ -36,6 +38,7 @@ pub struct Decomposer<G: GraphLike> {
     pub done: Vec<G>,
     pub scalar: ScalarN,
     pub nterms: usize,
+    timeout: Option<Instant>,
     simp_func: SimpFunc,
     random_t: bool,
     use_cats: bool,
@@ -63,6 +66,7 @@ impl<'a, G: GraphLike> Decomposer<G> {
             done: vec![],
             scalar: ScalarN::zero(),
             nterms: 0,
+            timeout: None,
             simp_func: NoSimp,
             random_t: false,
             use_cats: false,
@@ -136,6 +140,17 @@ impl<'a, G: GraphLike> Decomposer<G> {
         self
     }
 
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(Instant::now() + timeout);
+        self
+    }
+
+    fn timed_out(&self) -> bool {
+        self.timeout
+            .map(|t| t < Instant::now())
+            .unwrap_or(false)
+    }
+
     /// Computes `terms_for_tcount` for every graph on the stack
     pub fn max_terms(&self) -> f64 {
         let mut n = 0.0;
@@ -177,7 +192,7 @@ impl<'a, G: GraphLike> Decomposer<G> {
 
     /// Decompose until there are no T gates left
     pub fn decomp_all(&mut self) -> &mut Self {
-        while self.stack.len() > 0 { self.decomp_top(); }
+        while self.stack.len() > 0 && !self.timed_out() { self.decomp_top(); }
         self
     }
 
@@ -225,8 +240,8 @@ impl<'a, G: GraphLike> Decomposer<G> {
             self.scalar = &self.scalar + g.scalar();
             self.nterms += 1;
             if g.num_vertices() != 0 {
-                println!("{}", g.to_dot());
-                println!("WARNING: graph was not fully reduced");
+                //println!("{}", g.to_dot());
+                //println!("WARNING: graph was not fully reduced");
                 // println!("{}", g.to_dot());
             }
             if self.save { self.done.push(g); }
